@@ -22,7 +22,6 @@ import org.apache.poi.ss.usermodel.Row;
 
 public class SDP_Agent extends Agent {
 
-    //    private List<String> serviceTypes = new ArrayList<>();//for multiple services
     private String serviceType = null;
     private String safetyagentname = null;
 
@@ -32,7 +31,6 @@ public class SDP_Agent extends Agent {
     WriteToFile wtf = new WriteToFile();
 
     private HashMap<String, String> rqstq = new HashMap<String, String>();
-//    Simulation.MsgContainer container = new Simulation.MsgContainer();
 
     private String runway = "FREE";
     private int count = 0;
@@ -217,9 +215,9 @@ public class SDP_Agent extends Agent {
                 inform_content = new ArrayList<String>(Arrays.asList(msg.getContent().replaceAll("\\[|\\]", "").split(",")));
                 if (inform_content.get(1).trim().equals("RELEASED")) {
                     rqstq.remove(inform_content.get(0));
-                    runway = "FREE";
+//                    runway = "FREE";
                     count++; //controlling whether all airplane have accomplished their goal
-                    sdp_status.add(runway);
+                    sdp_status.add("FREE");
                     sdp_status.add(inform_content.get(0).trim());
                     sdp_status.add(rqstq.get(inform_content.get(0).trim()));
                     sdp_status.add(inform_content.get(1).trim());

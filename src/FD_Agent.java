@@ -100,7 +100,7 @@ public class FD_Agent extends Agent {
                         cfp_msg.add(nm);
                         cfp_msg.add("RQST");
                         cfp.setContent(cfp_msg.toString());
-                        cfp.setConversationId("landing_aircraft");
+                        cfp.setConversationId("landing_airport");
                         cfp.setReplyWith("cfp " + System.currentTimeMillis());
                         myAgent.send(cfp);
                         System.out.println(nm + " submitted CFP to " + airportname + "\n");
@@ -188,6 +188,7 @@ public class FD_Agent extends Agent {
                         if (agent_name != null) {
                             System.out.println(nm + " found the following SafetyAgent: " + agent_name + "\n");
                             phase = 5;
+//
                         } else {
                             System.out.println(nm + " no SafetyAgent nearby.\n");
                             phase = 4;
@@ -196,6 +197,7 @@ public class FD_Agent extends Agent {
                     } catch (FIPAException fe) {
                         fe.printStackTrace();
                     }
+
                     break;
 
                 case 5:
