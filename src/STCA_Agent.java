@@ -170,7 +170,6 @@ public class STCA_Agent extends Agent {
                         cfp.setConversationId("landing_aircraft");
                         cfp.setReplyWith("cfp " + System.currentTimeMillis());
                         myAgent.send(cfp);
-                        System.out.println(nm + " submitted CFP to FD:" + aircrafts + " .\n");
                         phase = 3;
                     } catch (Exception ex) {
                         ex.printStackTrace();
