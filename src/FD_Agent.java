@@ -43,10 +43,7 @@ public class FD_Agent extends Agent {
         } catch (FIPAException fe) {
             fe.printStackTrace();
         }
-
         addBehaviour(new LandingOperation());
-
-
     }
 
     protected void takeDown() {
@@ -62,7 +59,7 @@ public class FD_Agent extends Agent {
             switch (phase) {
                 case 0:
                     //search for airport
-                    System.out.println(nm + " searching for airport.\n");
+                    System.out.println(nm + ": searching for airport.\n");
                     DFAgentDescription template = new DFAgentDescription();
                     ServiceDescription sd = new ServiceDescription();
                     sd.setName("landing_airport");
@@ -78,17 +75,15 @@ public class FD_Agent extends Agent {
                         }
                         if (airportname != null) {
 //                            myAgent.addBehaviour(new submitLandingRequest());
-                            System.out.println(nm + " found the following airports: " + airportname + "\n");
+                            System.out.println(nm + ": found the following airports: " + airportname + "\n");
                             phase = 1;
                         } else {
-                            System.out.println(nm + " no airport nearby.\n");
-//                            myAgent.doDelete();
+                            System.out.println(nm + ": no airport nearby.\n");
                             phase = 0;
                         }
                     } catch (FIPAException fe) {
                         fe.printStackTrace();
                     }
-                    break;
                 case 1:
                     //send cfp to all all airports or SDP
                     List<String> cfp_msg = new ArrayList<>();
@@ -103,7 +98,7 @@ public class FD_Agent extends Agent {
                         cfp.setConversationId("landing_airport");
                         cfp.setReplyWith("cfp " + System.currentTimeMillis());
                         myAgent.send(cfp);
-                        System.out.println(nm + " submitted CFP to " + airportname + "\n");
+                        System.out.println(nm + ": submitted CFP to " + airportname + "\n");
                     } catch (Exception ex) {
                         ex.printStackTrace();
                     }
@@ -112,26 +107,25 @@ public class FD_Agent extends Agent {
                             MessageTemplate.MatchInReplyTo(cfp.getReplyWith()));
 
                     phase = 2;
-                    break;
                 case 2:
                     //receive responses from SDP
                     MessageTemplate mt = MessageTemplate.MatchPerformative(ACLMessage.INFORM);
                     ACLMessage msg = myAgent.receive(mt);
                     if (msg != null) {
-                        System.out.println("FD: SDP replay is not empty. \n");
+                        System.out.println(nm + ": SDP replay is not empty. \n");
                         if (msg.getPerformative() == ACLMessage.INFORM) {
                             inform_content = new ArrayList<String>(Arrays.asList(msg.getContent().replaceAll("\\[|\\]", "").split(",")));
                             if (nm.equals(inform_content.get(0))) {
-                                System.out.println(nm + " ready to notify for landing. \n");
+                                System.out.println(nm + ": ready to notify for landing. \n");
+                                phase =3;
                             }
                         }
 
                     } else {
-                        System.out.println("FD: SDP replay is empty. \n");
+                        System.out.println(nm + ": SDP replay is empty. \n");
                         block();
                     }
-                    phase = 3;
-                    break;
+
                 case 3:
                     //send ACK to airport
                     mt = MessageTemplate.MatchPerformative(ACLMessage.INFORM);
@@ -140,7 +134,7 @@ public class FD_Agent extends Agent {
                     try {
                         List<String> inform_content = new ArrayList<>();
                         if (msg != null) {
-                            System.out.println(nm + " ++++++ FD: received permission.\n");
+                            System.out.println(nm + ": received permission from SDP.\n");
 
                             inform_content = new ArrayList<String>(Arrays.asList(msg.getContent().replaceAll("\\[|\\]", "").split(",")));
                             System.out.println(inform_content + "inform content \n");
@@ -153,21 +147,20 @@ public class FD_Agent extends Agent {
                                 ack.setContent(inform.toString());
                                 ack.setReplyWith("claim" + System.currentTimeMillis());
                                 myAgent.send(ack);
-                                System.out.println(nm + " landing operation on progress.\n");
+                                System.out.println(nm + ": preparing to land.\n");
                                 phase = 4;
                             } else {
-                                phase = 1;
+                                block();
                             }
 
                         } else {
-                            System.out.println(nm + " ----------------  FD not yet received permission.\n");
+                            System.out.println(nm + ": not yet received permission from SDP.\n");
                             block();
                         }
                     } catch (Exception ex) {
                         ex.printStackTrace();
                     }
 
-                    break;
                 case 4:
                     //check for safety, first search for safety agent
                     System.out.println(nm + " searching for Safety Agent.\n");
@@ -186,44 +179,37 @@ public class FD_Agent extends Agent {
                             agent_name = result[i].getName().toString();
                         }
                         if (agent_name != null) {
-                            System.out.println(nm + " found the following SafetyAgent: " + agent_name + "\n");
-                            phase = 5;
-//
+                            System.out.println(nm + ": found the following SafetyAgent: " + agent_name + "\n");
+                            phase = 5;//
                         } else {
-                            System.out.println(nm + " no SafetyAgent nearby.\n");
-                            phase = 4;
-                            break;
+                            System.out.println(nm + ": no SafetyAgent nearby.\n");
+                            block();
                         }
                     } catch (FIPAException fe) {
                         fe.printStackTrace();
                     }
-
-                    break;
-
                 case 5:
                     //GET STCA permission
                     inform_content = new ArrayList<>();
                     mt = MessageTemplate.MatchPerformative(ACLMessage.CFP);
                     msg = myAgent.receive(mt);
                     try {
-//                        mt = MessageTemplate.MatchPerformative(ACLMessage.INFORM);
                         if (msg != null) {
-                            System.out.println(nm + " ++++++++++++ FD received STCA msg.\n");
+                            System.out.println(nm + ": received STCA msg.\n");
                             inform_content = new ArrayList<String>(Arrays.asList(msg.getContent().replaceAll("\\[|\\]", "").split(",")));
-                            System.out.println(inform_content + "inform content \n");
+                            System.out.println(inform_content + " \n FD : STCA inform content \n");
                             if (inform_content.get(0).equals(nm) && inform_content.get(1).trim().equals("GREEN")) {
                                 phase = 6;
-                                System.out.println(nm + " :-----  GREEN.\n");
-                                break;
+                                System.out.println(nm + ": STCA msg GREEN.\n");
+//                                //break;
                             } else {
-                                System.out.println(nm + ":------  STCA msg RED.\n");
-                                phase = 1;
-                                break;
+                                System.out.println(nm + ": STCA msg  RED.\n");
+                                block();
+
                             }
                         } else {
-                            System.out.println(nm + ":------  STCA DID NOT RESPOND.\n");
-                            phase = 1;
-                            break;
+                            System.out.println(nm + ": STCA DID NOT RESPOND.\n");
+                            block();
                         }
                     } catch (Exception fe) {
                         fe.printStackTrace();
@@ -236,10 +222,9 @@ public class FD_Agent extends Agent {
                     try {
                         inform_content = new ArrayList<>();
                         if (msg != null) {
-                            System.out.println(nm + ":+++++ FD received STCA permission.\n");
-
+                            System.out.println(nm + ": received STCA permission.\n");
                             inform_content = new ArrayList<String>(Arrays.asList(msg.getContent().replaceAll("\\[|\\]", "").split(",")));
-                            System.out.println(inform_content + "inform content \n");
+                            System.out.println(inform_content + " \n inform content \n");
                             if (nm.equals(inform_content.get(0).trim()) && inform_content.get(1).trim().equals("CLEARED")) {
                                 reply = msg.createReply();
                                 reply.setPerformative(ACLMessage.INFORM);
@@ -253,22 +238,18 @@ public class FD_Agent extends Agent {
                                 System.out.println(nm + " landing operation FINISHED AND REPORTED.\n");
                                 myAgent.doDelete();
                                 phase = 7;
+                                break;
                             } else {
-                                phase = 1;
+                                block();
                             }
-
                         } else {
-                            System.out.println(nm + " ----------------  FD not yet received permission.\n");
+                            System.out.println(nm + " : not yet received SDP permission.\n");
                             block();
                         }
                     } catch (Exception ex) {
                         ex.printStackTrace();
                     }
-
-                    break;
-
             }
-
         }
 
         public boolean done() {
@@ -278,7 +259,7 @@ public class FD_Agent extends Agent {
     }
 
     public int landingAction() {
-        System.out.println(nm + " Landing on progress.\n");
+        System.out.println(nm + ": Landing on progress.\n");
         return 0;
     }
 }

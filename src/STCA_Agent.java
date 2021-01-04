@@ -37,7 +37,7 @@ public class STCA_Agent extends Agent {
         service.setName("safety_check");
         service.setType("safety");
         dfd.addServices(service);
-        System.out.println("STCA: service type: " + serviceType + "\n");
+        System.out.println(nm + ": service type: " + serviceType + "\n");
         try {
             DFService.register(this, dfd);
         } catch (FIPAException fe) {
@@ -60,7 +60,7 @@ public class STCA_Agent extends Agent {
         } catch (FIPAException fe) {
             fe.printStackTrace();
         }
-        System.out.println(nm + " terminating. \n");
+        System.out.println(nm + ": terminating. \n");
     }
 
     public class CheckSafety extends Behaviour {
@@ -102,46 +102,39 @@ public class STCA_Agent extends Agent {
                         if (inform_content.get(1).trim().equals("UP")) {
                             //check if there are multiple CONFIRM, true randomly select one aircraft and notify GREEN
                             phase = 1;
-
                         } else {
                             System.out.println("-------------- STCA:FLAG not raised. \n");
-                            block();
+                           block();
                         }
                     } else {
                         System.out.println("-------------- STCA: STCA not yet received safety check request. \n");
-//                        phase = 0;
                         block();
-                    }
-                    break;
-                case 1:
 
-                    System.out.println(nm + " searching for aircrafts.\n");
+                    }
+                case 1:
+                    System.out.println(nm + ": searching for aircrafts.\n");
                     DFAgentDescription template1 = new DFAgentDescription();
                     ServiceDescription sd1 = new ServiceDescription();
                     sd1.setName("landing_aircraft");
                     sd1.setType("landing");
                     template1.addServices(sd1);
-                    String agent_name = null;
                     try {
                         // search for airports
                         DFAgentDescription[] result = DFService.search(myAgent, template1);
                         aircrafts = new AID[result.length];
                         for (int i = 0; i < result.length; ++i) {
                             aircrafts[i] = result[i].getName();
-                            agent_name = result[i].getName().toString();
                         }
-                        if (aircrafts != null) {
+                        if (aircrafts.length > 0) {
                             System.out.println(nm + " found the following Aircrafts: " + aircrafts + "\n");
                             phase = 2;
                         } else {
-                            System.out.println(nm + " no aircraft nearby.\n");
-                            phase = 0;
-                            break;
+                            System.out.println(nm + ": no aircraft nearby.\n");
+                            block();
                         }
                     } catch (FIPAException fe) {
                         fe.printStackTrace();
                     }
-                    break;
                 case 2:
                     // inform to aircraft
                     for (HashMap.Entry<String, String> entry : rqstq.entrySet()) {
@@ -154,31 +147,36 @@ public class STCA_Agent extends Agent {
                         //random select one and assign GREEN
                         Random rand = new Random();
                         fd_code = confirmlist.get(rand.nextInt(confirmlist.size()));
+                        System.out.println(fd_code + "\n STCA: selected from the confirmed list. \n");
                     }
-                    System.out.println(fd_code + "\n STCA: selected from the confirmed list. \n");
 
                     List<String> cfp_msg = new ArrayList<>();
                     ACLMessage cfp = new ACLMessage(ACLMessage.CFP);
-                    try {
-                        for (int i = 0; i < aircrafts.length; ++i) {
-                            cfp.addReceiver(aircrafts[i]);
-                            System.out.println(aircrafts[i].getName() + "\n");
+                    if (fd_code != null) {
+                        try {
+                            for (int i = 0; i < aircrafts.length; ++i) {
+                                cfp.addReceiver(aircrafts[i]);
+                                System.out.println(aircrafts[i].getName() + "\n");
+                            }
+                            cfp_msg.add(fd_code);
+                            cfp_msg.add("GREEN");
+                            cfp.setContent(cfp_msg.toString());
+                            cfp.setConversationId("landing_aircraft");
+                            cfp.setReplyWith("cfp " + System.currentTimeMillis());
+                            myAgent.send(cfp);
+                            phase = 3;
+                            block();
+                        } catch (Exception ex) {
+                            ex.printStackTrace();
+                            System.out.println(nm + " NOT submitted CFP to STCA. \n");
+                            //phase =1;
+                            block();
                         }
-                        cfp_msg.add(fd_code);
-                        cfp_msg.add("GREEN");
-                        cfp.setContent(cfp_msg.toString());
-                        cfp.setConversationId("landing_aircraft");
-                        cfp.setReplyWith("cfp " + System.currentTimeMillis());
-                        myAgent.send(cfp);
-                        phase = 3;
-                    } catch (Exception ex) {
-                        ex.printStackTrace();
-                    }
-                    if (phase != 3) {
-                        System.out.println(nm + " NOT submitted CFP to STCA. \n");
-                        phase = 0;
-                    }
-                    break;
+                    }else {
+                        System.out.println(fd_code + "\n STCA: selected from the confirmed list. \n");
+                        //phase = 1;
+                        block();
+                     }
             }
 
         }

@@ -45,7 +45,7 @@ public class Simulation {
     }
 
     public static class AircraftNumber{
-        private int AN = 3;
+        private int AN = 5;
 
         AircraftNumber(){}
 

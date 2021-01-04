@@ -41,7 +41,7 @@ public class SDP_Agent extends Agent {
     protected void setup() {
         nm = getAID().getName();
         nm = nm.substring(0, nm.indexOf('@'));
-        System.out.println(nm + " is ready.\n");
+        System.out.println(nm + ": is ready.\n");
         // register services
         DFAgentDescription dfd = new DFAgentDescription();
         dfd.setName(getAID());
@@ -49,7 +49,7 @@ public class SDP_Agent extends Agent {
         // we can list multiple services
         serviceType = "landing";
 
-        System.out.println(nm + " starting. \n");
+        System.out.println(nm + ": starting. \n");
         service.setName("landing_airport");
         service.setType("landing");
         dfd.addServices(service);
@@ -81,7 +81,7 @@ public class SDP_Agent extends Agent {
         } catch (FIPAException fe) {
             fe.printStackTrace();
         }
-        System.out.println("SDP " + nm + " terminating. \n");
+        System.out.println( nm + ": terminating. \n");
     }
 
     private class ServeRequest extends CyclicBehaviour {
@@ -98,7 +98,7 @@ public class SDP_Agent extends Agent {
             boolean flg = false;
 
             if (msg != null) {
-                System.out.println("SDP: CFP not empty \n ");
+                System.out.println(nm + ": FD CFP not empty \n ");
 
                 if (msg.getContent() != null) {
                     cfp_content = new ArrayList<String>(Arrays.asList(msg.getContent().replaceAll("\\[|\\]", "").split(",")));
@@ -126,10 +126,10 @@ public class SDP_Agent extends Agent {
                         sdp_rprt.add(sdp_status3);
                     }
                 }
-                System.out.println(rqstq+ "\n SDP:response to CFP ");
+                System.out.println(rqstq + "\n SDP:response to CFP .\n");
 
                 if (rqstq != null) {
-                    System.out.println("SDP:  Request list not empty \n ");
+                    System.out.println(nm + ": request list not empty. \n ");
 
                     try {
                         reply = msg.createReply();
@@ -137,7 +137,7 @@ public class SDP_Agent extends Agent {
                         reply.setConversationId("landing_aircraft");
                         //should only check if ACK is already granted
                         String randomaircraftname = (String) rqstq.keySet().toArray()[new Random().nextInt(rqstq.keySet().toArray().length)];
-                        System.out.println(randomaircraftname + " random name\n");
+                        System.out.println(randomaircraftname + ": random selected FD.\n");
 
                         if (runway.equals("FREE") && rqstq.get(randomaircraftname).trim().equals("WAITING")) {
                             //iterate
@@ -185,94 +185,81 @@ public class SDP_Agent extends Agent {
                             sdp_rprt.add(sdp_status2);
                             System.out.println(sdp_status + " \n SDP:container information\n");
                         }
-                        //execution result
 
                     } catch (Exception e) {
                         System.out.println(e + "error00\n");
                     }
 
                 } else {
-                    System.out.println("SDP: Request list empty \n ");
+                    System.out.println(nm + ": request list empty \n ");
                     block();
                 }
             } else {
-                System.out.println("SDP: CFP empty \n ");
+                System.out.println(nm + ": CFP empty \n ");
                 block();
             }
         }
 
     }
 
-    private class ServeReplies extends CyclicBehaviour {
+    private class ServeReplies extends Behaviour {
         List<String> inform_content = new ArrayList<>();
+        private int phase = 0;
+        private AID[] safety_agents;
 
         public void action() {
             MessageTemplate mt = MessageTemplate.MatchPerformative(ACLMessage.INFORM);
             ACLMessage msg = myAgent.receive(mt);
             List<String> sdp_status = new ArrayList<>();
 
-            if (msg != null) {
-                inform_content = new ArrayList<String>(Arrays.asList(msg.getContent().replaceAll("\\[|\\]", "").split(",")));
-                if (inform_content.get(1).trim().equals("RELEASED")) {
-                    rqstq.remove(inform_content.get(0));
-//                    runway = "FREE";
-                    count++; //controlling whether all airplane have accomplished their goal
-                    sdp_status.add("FREE");
-                    sdp_status.add(inform_content.get(0).trim());
-                    sdp_status.add(rqstq.get(inform_content.get(0).trim()));
-                    sdp_status.add(inform_content.get(1).trim());
-
-                    sdp_rprt.add(sdp_status);
-                    System.out.println(sdp_status + " \n SDP: container information\n");
-
-                }
-                if (inform_content.get(1).trim().equals("ACK")) {
-                    // raise flag for STCA
-                    rqstq.put(inform_content.get(0).trim(), "CONFIRMED");
-                    sdp_status.add(runway);
-                    sdp_status.add(inform_content.get(0).trim());
-                    sdp_status.add(rqstq.get(inform_content.get(0).trim()));
-                    sdp_status.add(inform_content.get(1).trim());
-
-                    sdp_rprt.add(sdp_status);
-                    System.out.println("SDP: communicate STCA \n");
-                    // Search STCA, and INFORM
-                    System.out.println("SDP: communicate STCA &&&&&&& \n" + rqstq);
-
-                    addBehaviour(new SafetyCheckAgent(rqstq));
-                }
-                System.out.println("++++++++++++++ SDP: received acknowledgement. \n");
-                System.out.println(inform_content + " ACK content. \n");
-
-            } else {
-                System.out.println("-------------- SDP: not yet received acknowledgement. \n");
-                block();
-            }
-            if (count == aircraftNumber.getAN()) { //number of aircraft reported RELEASED
-                myAgent.doDelete();
-            }
-        }
-    }
-
-    private class SafetyCheckAgent extends Behaviour {
-
-        SafetyCheckAgent(HashMap<String, String>  rqstq ){
-            HashMap<String, String>  container = rqstq;
-        }
-        private AID[] safety_agents;
-        private MessageTemplate mt;
-        private int phase = 0;
-
-        public void action() {
             switch (phase) {
                 case 0:
+                    if (msg != null) {
+                        inform_content = new ArrayList<String>(Arrays.asList(msg.getContent().replaceAll("\\[|\\]", "").split(",")));
+                        if (inform_content.get(1).trim().equals("RELEASED")) {
+                            rqstq.remove(inform_content.get(0));
+                            //runway = "FREE";
+                            count++; //controlling whether all airplane have accomplished their goal
+                            sdp_status.add("FREE");
+                            sdp_status.add(inform_content.get(0).trim());
+                            sdp_status.add(rqstq.get(inform_content.get(0).trim()));
+                            sdp_status.add(inform_content.get(1).trim());
+
+                            sdp_rprt.add(sdp_status);
+                            System.out.println(sdp_status + " \n SDP: container information\n");
+                            if (count == aircraftNumber.getAN()) { //number of aircraft reported RELEASED
+                                myAgent.doDelete();
+                            }
+                            break;
+                        }
+                        if (inform_content.get(1).trim().equals("ACK")) {
+                            // raise flag for STCA
+                            rqstq.put(inform_content.get(0).trim(), "CONFIRMED");
+                            sdp_status.add(runway);
+                            sdp_status.add(inform_content.get(0).trim());
+                            sdp_status.add(rqstq.get(inform_content.get(0).trim()));
+                            sdp_status.add(inform_content.get(1).trim());
+
+                            sdp_rprt.add(sdp_status);
+                            System.out.println("SDP: communicate STCA \n");
+                            // Search STCA, and INFORM
+                            System.out.println("SDP: communicate STCA &&&&&&& \n" + rqstq);
+                            phase = 1;
+                        }
+                        System.out.println("++++++++++++++ SDP: received acknowledgement. \n");
+                        System.out.println(inform_content + " ACK content. \n");
+
+                    } else {
+                        System.out.println("-------------- SDP: not yet received acknowledgement. \n");
+                        block();
+                    }
+                case 1:
                     System.out.println(nm + " searching for Safety Agent.\n");
                     DFAgentDescription template1 = new DFAgentDescription();
                     ServiceDescription sd1 = new ServiceDescription();
                     sd1.setName("safety_check");
                     sd1.setType("safety");
                     template1.addServices(sd1);
-//                    String agent_name = null;
                     try {
                         // search for safety agent
                         DFAgentDescription[] result = DFService.search(myAgent, template1);
@@ -282,18 +269,16 @@ public class SDP_Agent extends Agent {
                             safetyagentname = result[i].getName().toString();
                         }
                         if (safetyagentname != null) {
-                            System.out.println(nm + " found the following SafetyAgent: " + safetyagentname + "\n");
-                            phase = 1;
+                            System.out.println(nm + ": found the following SafetyAgent: " + safetyagentname + "\n");
+                            phase = 2;
                         } else {
                             System.out.println(nm + " no SafetyAgent nearby.\n");
-                            phase = 0;
+                            block();
                         }
                     } catch (Exception fe) {
                         fe.printStackTrace();
                     }
-
-                    break;
-                case 1:
+                case 2:
                     List<String> cfp_msg = new ArrayList<>();
                     ACLMessage cfp = new ACLMessage(ACLMessage.CFP);
                     try {
@@ -310,22 +295,24 @@ public class SDP_Agent extends Agent {
                         cfp.setReplyWith("cfp " + System.currentTimeMillis());
                         myAgent.send(cfp);
                         System.out.println(nm + " submitted CFP to STCA:" + safetyagentname + " .\n");
-                        phase = 2;
+                        phase = 3;
+                        break;
                     } catch (Exception ex) {
                         ex.printStackTrace();
-                    }
-                    if (phase != 2) {
                         System.out.println(nm + " NOT submitted CFP to STCA. \n");
-                        phase = 0;
+                        block();
                     }
-                    break;
             }
+
         }
 
         public boolean done() {
-            return (phase == 2);
+            return (phase == 3 );
         }
+
+
     }
+
 
     private class WriteToFile {
         public void writeToExcel(List<List<String>> input) {
