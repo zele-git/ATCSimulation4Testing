@@ -17,7 +17,6 @@ public class STCA_Agent extends Agent {
     private String aircraftname = null;
 
     private String serviceType = null;
-    //    Simulation.MsgContainer container = new Simulation.MsgContainer();
     private HashMap<String, String> rqstq = new HashMap<String, String>();
 
     private String nm;
@@ -126,11 +125,12 @@ public class STCA_Agent extends Agent {
                             aircrafts[i] = result[i].getName();
                         }
                         if (aircrafts.length > 0) {
-                            System.out.println(nm + " found the following Aircrafts: " + aircrafts + "\n");
+                            System.out.println(nm + ": found the following Aircrafts: " + aircrafts + "\n");
                             phase = 2;
                         } else {
                             System.out.println(nm + ": no aircraft nearby.\n");
-                            block();
+                            myAgent.doDelete();
+
                         }
                     } catch (FIPAException fe) {
                         fe.printStackTrace();
@@ -148,35 +148,37 @@ public class STCA_Agent extends Agent {
                         Random rand = new Random();
                         fd_code = confirmlist.get(rand.nextInt(confirmlist.size()));
                         System.out.println(fd_code + "\n STCA: selected from the confirmed list. \n");
-                    }
 
-                    List<String> cfp_msg = new ArrayList<>();
-                    ACLMessage cfp = new ACLMessage(ACLMessage.CFP);
-                    if (fd_code != null) {
-                        try {
-                            for (int i = 0; i < aircrafts.length; ++i) {
-                                cfp.addReceiver(aircrafts[i]);
-                                System.out.println(aircrafts[i].getName() + "\n");
+                        List<String> cfp_msg = new ArrayList<>();
+                        ACLMessage cfp = new ACLMessage(ACLMessage.CFP);
+                        if (fd_code != null) {
+                            try {
+                                for (int i = 0; i < aircrafts.length; ++i) {
+                                    cfp.addReceiver(aircrafts[i]);
+                                    System.out.println(aircrafts[i].getName() + "\n");
+                                }
+                                cfp_msg.add(fd_code);
+                                cfp_msg.add("GREEN");
+                                cfp.setContent(cfp_msg.toString());
+                                cfp.setConversationId("landing_aircraft");
+                                cfp.setReplyWith("cfp " + System.currentTimeMillis());
+                                myAgent.send(cfp);
+                                phase = 3;
+                                block();
+                            } catch (Exception ex) {
+                                ex.printStackTrace();
+                                System.out.println(nm + " NOT submitted CFP to STCA. \n");
+                                //phase =1;
+                                block();
                             }
-                            cfp_msg.add(fd_code);
-                            cfp_msg.add("GREEN");
-                            cfp.setContent(cfp_msg.toString());
-                            cfp.setConversationId("landing_aircraft");
-                            cfp.setReplyWith("cfp " + System.currentTimeMillis());
-                            myAgent.send(cfp);
-                            phase = 3;
-                            block();
-                        } catch (Exception ex) {
-                            ex.printStackTrace();
-                            System.out.println(nm + " NOT submitted CFP to STCA. \n");
-                            //phase =1;
+                        }else {
+                            System.out.println(fd_code + "\n STCA: selected from the confirmed list. \n");
+                            //phase = 1;
                             block();
                         }
                     }else {
-                        System.out.println(fd_code + "\n STCA: selected from the confirmed list. \n");
-                        //phase = 1;
                         block();
-                     }
+                    }
             }
 
         }

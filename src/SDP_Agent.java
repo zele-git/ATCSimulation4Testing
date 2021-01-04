@@ -81,11 +81,14 @@ public class SDP_Agent extends Agent {
         } catch (FIPAException fe) {
             fe.printStackTrace();
         }
-        System.out.println( nm + ": terminating. \n");
+        System.out.println(nm + ": terminating. \n");
     }
 
-    private class ServeRequest extends CyclicBehaviour {
+    private class ServeRequest extends Behaviour {
+        private int phase = 0;
+
         public void action() {
+
             MessageTemplate mt = MessageTemplate.MatchPerformative(ACLMessage.CFP);
             ACLMessage msg = myAgent.receive(mt);
             ACLMessage reply = null;
@@ -96,110 +99,108 @@ public class SDP_Agent extends Agent {
             List<String> sdp_status3 = new ArrayList<>();
 
             boolean flg = false;
-
-            if (msg != null) {
-                System.out.println(nm + ": FD CFP not empty \n ");
-
-                if (msg.getContent() != null) {
-                    cfp_content = new ArrayList<String>(Arrays.asList(msg.getContent().replaceAll("\\[|\\]", "").split(",")));
-                    Iterator<Map.Entry<String, String>>
-                            iterator = rqstq.entrySet().iterator();
-                    while (iterator.hasNext()) {
-                        Map.Entry<String, String> entry = iterator.next();
-                        if (entry.getKey().equals(cfp_content.get(0)))
-                            flg = true;
-                    }
-                    if (flg == false) {
-                        rqstq.put(cfp_content.get(0), "WAITING");
-                        //iterate
-                        iterator = rqstq.entrySet().iterator();
+            switch (phase) {
+                case 0:
+                    if (msg != null) {
+                        System.out.println(nm + ": FD CFP not empty \n ");
+                        cfp_content = new ArrayList<String>(Arrays.asList(msg.getContent().replaceAll("\\[|\\]", "").split(",")));
+                        Iterator<Map.Entry<String, String>>
+                                iterator = rqstq.entrySet().iterator();
                         while (iterator.hasNext()) {
                             Map.Entry<String, String> entry = iterator.next();
-                            if (entry.getKey().equals(cfp_content.get(0).trim())) {
-                                sdp_status3.add(runway);
-                                sdp_status3.add(cfp_content.get(0).trim());
-                                sdp_status3.add(rqstq.get(cfp_content.get(0)));
-                                sdp_status3.add(cfp_content.get(1));
-                            }
+                            if (entry.getKey().equals(cfp_content.get(0)))
+                                flg = true;
                         }
-
-                        sdp_rprt.add(sdp_status3);
-                    }
-                }
-                System.out.println(rqstq + "\n SDP:response to CFP .\n");
-
-                if (rqstq != null) {
-                    System.out.println(nm + ": request list not empty. \n ");
-
-                    try {
-                        reply = msg.createReply();
-                        reply.setPerformative(ACLMessage.INFORM);
-                        reply.setConversationId("landing_aircraft");
-                        //should only check if ACK is already granted
-                        String randomaircraftname = (String) rqstq.keySet().toArray()[new Random().nextInt(rqstq.keySet().toArray().length)];
-                        System.out.println(randomaircraftname + ": random selected FD.\n");
-
-                        if (runway.equals("FREE") && rqstq.get(randomaircraftname).trim().equals("WAITING")) {
+                        if (flg == false) {
+                            rqstq.put(cfp_content.get(0), "WAITING");
                             //iterate
-                            Iterator<Map.Entry<String, String>>
-                                    iterator = rqstq.entrySet().iterator();
+                            iterator = rqstq.entrySet().iterator();
                             while (iterator.hasNext()) {
                                 Map.Entry<String, String> entry = iterator.next();
-                                if (entry.getKey().equals(randomaircraftname)) {
-                                    sdp_status.add(runway);
-                                    sdp_status.add(randomaircraftname);
-                                    sdp_status.add(entry.getValue());
-                                    sdp_status.add(cfp_content.get(1));
+                                if (entry.getKey().equals(cfp_content.get(0).trim())) {
+                                    sdp_status3.add(runway);
+                                    sdp_status3.add(cfp_content.get(0).trim());
+                                    sdp_status3.add(rqstq.get(cfp_content.get(0)));
+                                    sdp_status3.add(cfp_content.get(1));
                                 }
                             }
-                            inform_content.add(randomaircraftname);
-                            inform_content.add("CLEARED");
-                            reply.setContent(inform_content.toString());
-                            myAgent.send(reply);
-                            rqstq.put(randomaircraftname, "CLEARED");
-                            runway = "BUSY";
-
-                            sdp_rprt.add(sdp_status);
-                            System.out.println(sdp_status + " \n SDP:container information\n");
+                            sdp_rprt.add(sdp_status3);
                         }
-                        if (runway.equals("BUSY") && rqstq.get(randomaircraftname).trim().equals("CLEARED")) {
-                            Iterator<Map.Entry<String, String>>
-                                    iterator = rqstq.entrySet().iterator();
-                            while (iterator.hasNext()) {
-                                Map.Entry<String, String> entry = iterator.next();
-                                if (entry.getKey().equals(randomaircraftname)) {
-                                    sdp_status2.add(runway);
-                                    sdp_status2.add(randomaircraftname);
-                                    sdp_status2.add(entry.getValue());
-                                    sdp_status.add(cfp_content.get(1));
-                                }
-                            }
-
-                            inform_content.add(randomaircraftname);
-                            inform_content.add("WAITING");
-                            reply.setContent(inform_content.toString());
-                            myAgent.send(reply);
-                            rqstq.put(randomaircraftname, "WAITING");
-                            runway = "FREE";
-
-                            sdp_rprt.add(sdp_status2);
-                            System.out.println(sdp_status + " \n SDP:container information\n");
-                        }
-
-                    } catch (Exception e) {
-                        System.out.println(e + "error00\n");
+                        System.out.println(rqstq + "\n SDP:response to CFP .\n");
+                    } else {
+                        System.out.println(nm + " CFP message not yet arrived.\n");
                     }
+                    phase = 1;
+                case 1:
+                    if (rqstq != null) {
+                        System.out.println(nm + ": request list not empty. \n ");
+                        try {
+                            reply = msg.createReply();
+                            reply.setPerformative(ACLMessage.INFORM);
+                            reply.setConversationId("landing_aircraft");
+                            //should only check if ACK is already granted
+                            String randomaircraftname = (String) rqstq.keySet().toArray()[new Random().nextInt(rqstq.keySet().toArray().length)];
+                            System.out.println(randomaircraftname + ": random selected FD.\n");
 
-                } else {
-                    System.out.println(nm + ": request list empty \n ");
-                    block();
-                }
-            } else {
-                System.out.println(nm + ": CFP empty \n ");
-                block();
+                            if (runway.equals("FREE") && rqstq.get(randomaircraftname).trim().equals("WAITING")) {
+                                //iterate
+                                Iterator<Map.Entry<String, String>>
+                                        iterator = rqstq.entrySet().iterator();
+                                while (iterator.hasNext()) {
+                                    Map.Entry<String, String> entry = iterator.next();
+                                    if (entry.getKey().equals(randomaircraftname)) {
+                                        sdp_status.add(runway);
+                                        sdp_status.add(randomaircraftname);
+                                        sdp_status.add(entry.getValue());
+                                        sdp_status.add(cfp_content.get(1));
+                                    }
+                                }
+                                inform_content.add(randomaircraftname);
+                                inform_content.add("CLEARED");
+                                reply.setContent(inform_content.toString());
+                                myAgent.send(reply);
+                                rqstq.put(randomaircraftname, "CLEARED");
+                                runway = "BUSY";
+                                sdp_rprt.add(sdp_status);
+                                System.out.println(sdp_status + " \n SDP:container information\n");
+                            }
+                            if (runway.equals("BUSY") && rqstq.get(randomaircraftname).trim().equals("CLEARED")) {
+                                Iterator<Map.Entry<String, String>>
+                                        iterator = rqstq.entrySet().iterator();
+                                while (iterator.hasNext()) {
+                                    Map.Entry<String, String> entry = iterator.next();
+                                    if (entry.getKey().equals(randomaircraftname)) {
+                                        sdp_status2.add(runway);
+                                        sdp_status2.add(randomaircraftname);
+                                        sdp_status2.add(entry.getValue());
+                                        sdp_status.add(cfp_content.get(1));
+                                    }
+                                }
+                                inform_content.add(randomaircraftname);
+                                inform_content.add("WAITING");
+                                reply.setContent(inform_content.toString());
+                                myAgent.send(reply);
+                                rqstq.put(randomaircraftname, "WAITING");
+                                runway = "FREE";
+                                sdp_rprt.add(sdp_status2);
+                                System.out.println(sdp_status + " \n SDP:container information\n");
+
+                            }
+                        } catch (Exception e) {
+                            System.out.println(e + "error00\n");
+                        }
+                    } else {
+                        System.out.println(rqstq + " is null\n");
+                        block();
+                    }
+                    phase = 2;
             }
+
         }
 
+        public boolean done() {
+            return (phase == 2);
+        }
     }
 
     private class ServeReplies extends Behaviour {
@@ -208,12 +209,12 @@ public class SDP_Agent extends Agent {
         private AID[] safety_agents;
 
         public void action() {
-            MessageTemplate mt = MessageTemplate.MatchPerformative(ACLMessage.INFORM);
-            ACLMessage msg = myAgent.receive(mt);
-            List<String> sdp_status = new ArrayList<>();
 
             switch (phase) {
                 case 0:
+                    MessageTemplate mt = MessageTemplate.MatchPerformative(ACLMessage.INFORM);
+                    ACLMessage msg = myAgent.receive(mt);
+                    List<String> sdp_status = new ArrayList<>();
                     if (msg != null) {
                         inform_content = new ArrayList<String>(Arrays.asList(msg.getContent().replaceAll("\\[|\\]", "").split(",")));
                         if (inform_content.get(1).trim().equals("RELEASED")) {
@@ -245,6 +246,8 @@ public class SDP_Agent extends Agent {
                             // Search STCA, and INFORM
                             System.out.println("SDP: communicate STCA &&&&&&& \n" + rqstq);
                             phase = 1;
+                        }else{
+                            block();
                         }
                         System.out.println("++++++++++++++ SDP: received acknowledgement. \n");
                         System.out.println(inform_content + " ACK content. \n");
@@ -307,7 +310,7 @@ public class SDP_Agent extends Agent {
         }
 
         public boolean done() {
-            return (phase == 3 );
+            return (phase == 3);
         }
 
 
