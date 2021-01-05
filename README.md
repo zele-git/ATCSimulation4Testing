@@ -8,3 +8,13 @@ In this work, we implemented the simulation of aircraft landing operation using 
 **PAT-based cyberattack-driven test case generation** 
 
 A model checking approach for test case generation is not a new idea (cite). We want to use this approach for focused test case generation i.e. a test case designed for specific property of the system based on known (putative) cyberattacks. For this purpose, we model putative cyberattacker behaviour as one component of the sysem under consideration. This opens an opportunity to analyze the vulnerablity of the system and its impacted behaviours.  
+
+**PAT model**
+
+**Safety property**
+
+**Cyberattack leading to safety property violation **
+
+**Automatic test case generation from PAT counterexamples**
+
+**Test case viability evaluation **
