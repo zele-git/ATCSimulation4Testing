@@ -13,8 +13,8 @@ A model checking approach for test case generation is not a new idea (cite). We 
 
 **Safety property**
 
-**Cyberattack leading to safety property violation **
+**Cyberattack leading to safety property violation**
 
 **Automatic test case generation from PAT counterexamples**
 
-**Test case viability evaluation **
+**Test case viability evaluation**
