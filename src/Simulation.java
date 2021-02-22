@@ -18,16 +18,8 @@ public class Simulation {
 
         AgentController managerController;
         try {
-            managerController = cc.createNewAgent("Manager", "SDP_Agent", null);
+            managerController = cc.createNewAgent("SDP", "SDP_Agent", null);
             managerController.start();
-        } catch (StaleProxyException e) {
-            e.printStackTrace();
-        }
-
-        AgentController stcaController;
-        try {
-            stcaController = cc.createNewAgent("SafetyAgent", "STCA_Agent", null);
-            stcaController.start();
         } catch (StaleProxyException e) {
             e.printStackTrace();
         }
@@ -35,19 +27,37 @@ public class Simulation {
         for (int i = 0; i < aircraftNumber.getAN(); i++) {
             AgentController amController;
             try {
-                amController = cc.createNewAgent("Aircraft 0" + i, "FD_Agent", null);
+                amController = cc.createNewAgent("FD" + i, "FD_Agent", null);
                 amController.start();
             } catch (StaleProxyException e) {
                 e.printStackTrace();
             }
         }
 
+        AgentController stcaController;
+        try {
+            stcaController = cc.createNewAgent("STCA", "STCA_Agent", null);
+            stcaController.start();
+        } catch (StaleProxyException e) {
+            e.printStackTrace();
+        }
+
+        AgentController snifferController;
+        try {
+            snifferController = cc.createNewAgent("Tester", "Test_Agent", null);
+            snifferController.start();
+        } catch (StaleProxyException e) {
+            e.printStackTrace();
+        }
+
+
     }
 
-    public static class AircraftNumber{
+    public static class AircraftNumber {
         private int AN = 5;
 
-        AircraftNumber(){}
+        AircraftNumber() {
+        }
 
         public int getAN() {
             return AN;
@@ -59,9 +69,12 @@ public class Simulation {
 
     }
 
-    public static class MsgContainer{
-        MsgContainer(){}
+    public static class MsgContainer {
+        MsgContainer() {
+        }
+
         private HashMap<String, String> rqstq = new HashMap<String, String>();
+
         public HashMap<String, String> getRqstq() {
             return rqstq;
         }
@@ -69,7 +82,6 @@ public class Simulation {
         public void setRqstq(HashMap<String, String> rqstq) {
             this.rqstq = rqstq;
         }
-
 
 
     }

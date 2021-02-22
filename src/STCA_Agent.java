@@ -1,3 +1,4 @@
+import com.sun.org.apache.xerces.internal.impl.dv.xs.AbstractDateTimeDV;
 import com.sun.org.apache.xml.internal.resolver.readers.ExtendedXMLCatalogReader;
 import jade.core.AID;
 import jade.core.Agent;
@@ -14,29 +15,24 @@ import java.util.stream.Collectors;
 
 public class STCA_Agent extends Agent {
     private AID[] aircrafts;
-    private String aircraftname = null;
 
-    private String serviceType = null;
     private HashMap<String, String> rqstq = new HashMap<String, String>();
-
+    Simulation.AircraftNumber aircraftNumber = new Simulation.AircraftNumber();
     private String nm;
+    private AID sniff_aid;
 
     protected void setup() {
         nm = getAID().getName();
         nm = nm.substring(0, nm.indexOf('@'));
-        System.out.println(nm + " is ready.\n");
-        // register services
         DFAgentDescription dfd = new DFAgentDescription();
         dfd.setName(getAID());
         ServiceDescription service = new ServiceDescription();
-        // we can list multiple services
-        serviceType = "safety";
+
 
         System.out.println(nm + " starting. \n");
-        service.setName("safety_check");
+        service.setName("stca");
         service.setType("safety");
         dfd.addServices(service);
-        System.out.println(nm + ": service type: " + serviceType + "\n");
         try {
             DFService.register(this, dfd);
         } catch (FIPAException fe) {
@@ -50,7 +46,6 @@ public class STCA_Agent extends Agent {
 
             }
         });
-
     }
 
     protected void takeDown() {
@@ -65,122 +60,196 @@ public class STCA_Agent extends Agent {
     public class CheckSafety extends Behaviour {
         private HashMap<String, String> rqstq = new HashMap<String, String>();
         private int phase = 0;
+        private int count = 0;
 
         public void action() {
             List<String> inform_content = new ArrayList<>();
             List<String> rqst_check = new ArrayList<>();
+            List<String> aid_list = new ArrayList<>();
 
             List<String> confirmlist = new ArrayList<>();
             String fd_code = null;
+
             switch (phase) {
-                case 0:
-                    MessageTemplate mt = MessageTemplate.MatchPerformative(ACLMessage.CFP);
+                case 0:// GET message from SDP
+                    MessageTemplate mt = MessageTemplate.MatchPerformative(ACLMessage.INFORM);
                     ACLMessage msg = myAgent.receive(mt);
-                    ACLMessage reply = null;
 
                     if (msg != null) {
                         inform_content = new ArrayList<String>(Arrays.asList(msg.getContent().replaceAll("\\[|\\]|\\{|\\}", "").split(",")));
                         rqst_check = new ArrayList<String>(inform_content.subList(2, inform_content.size()));
-                        System.out.println(inform_content + "\n STCA: SDP message to STCA");
-                        System.out.println(rqst_check + "\n STCA: SDP message to STCA");
-                        for (String i : rqst_check) {
-                            System.out.println(i.trim().substring(i.indexOf('=')));
-                        }
-                        // string input should be converted to map
-                        for (String item : rqst_check) {
-                            if (item != null) {
-                                String mapk = null, mapv = null;
-                                mapk = item.trim().substring(0, item.indexOf('=') - 1);
-                                mapv = item.trim().substring(item.indexOf('='));
-                                rqstq.put(mapk, mapv);
+                       // System.out.println(inform_content + "\n STCA: SDP message to STCA");
+
+                        if (rqst_check.size()> 0) {//convert list to map
+                           // System.out.println(nm + " request check is not empty. \n ");
+                            for (String item : rqst_check) {
+                                if (item != null) {
+                                    String mapk = null, mapv = null;
+                                    try {
+                                        mapk = item.trim().substring(0, item.indexOf('=') - 1);
+                                        mapv = item.trim().substring(item.indexOf('='));
+                                        rqstq.put(mapk, mapv);
+                                    } catch (Exception fe) {
+                                        fe.printStackTrace();
+                                    }
+                                }
                             }
                         }
-
-                        System.out.println(rqstq + "\n STCA: SDP message converted to map ");
-
+                        //System.out.println(rqstq + "\n STCA: SDP message converted to map ");
                         if (inform_content.get(1).trim().equals("UP")) {
                             //check if there are multiple CONFIRM, true randomly select one aircraft and notify GREEN
                             phase = 1;
                         } else {
                             System.out.println("-------------- STCA:FLAG not raised. \n");
-                           block();
+//                            phase = 0;
+                            block();
                         }
-                    } else {
-                        System.out.println("-------------- STCA: STCA not yet received safety check request. \n");
-                        block();
 
+                    } else {
+                        //System.out.println(nm + " Not yet received request. \n");
+                        block();
+//                        phase = 0;
                     }
-                case 1:
-                    System.out.println(nm + ": searching for aircrafts.\n");
-                    DFAgentDescription template1 = new DFAgentDescription();
+
+                case 1://locate aircraft
+                    System.out.println(nm + " searching for Aircraft.\n");
+                    DFAgentDescription tmplt = new DFAgentDescription();
                     ServiceDescription sd1 = new ServiceDescription();
-                    sd1.setName("landing_aircraft");
+                    sd1.setName("aircraft");
                     sd1.setType("landing");
-                    template1.addServices(sd1);
+                    tmplt.addServices(sd1);
+                    List<String> aircraft_name = new ArrayList<>();
+
                     try {
-                        // search for airports
-                        DFAgentDescription[] result = DFService.search(myAgent, template1);
+                        DFAgentDescription[] result = DFService.search(myAgent, tmplt);
                         aircrafts = new AID[result.length];
                         for (int i = 0; i < result.length; ++i) {
                             aircrafts[i] = result[i].getName();
+                            aircraft_name.add(result[i].getName().toString());
                         }
-                        if (aircrafts.length > 0) {
-                            System.out.println(nm + ": found the following Aircrafts: " + aircrafts + "\n");
-                            phase = 2;
-                        } else {
-                            System.out.println(nm + ": no aircraft nearby.\n");
-                            myAgent.doDelete();
+                        if (aircraft_name.size()> 0) {
+                            //System.out.println(nm + ": found the following Aircraft: " + aircraft_name + "\n");
+                            // extracting aircraft name from the result
+                            for (int i = 0; i < result.length; ++i) {
+                                aircrafts[i] = result[i].getName();
+                                String aid = result[i].getName().getLocalName();//.toString().trim().substring(result[i].getName().toString().trim().indexOf('F'), result[i].getName().toString().trim().indexOf('@'));
 
-                        }
-                    } catch (FIPAException fe) {
-                        fe.printStackTrace();
-                    }
-                case 2:
-                    // inform to aircraft
-                    for (HashMap.Entry<String, String> entry : rqstq.entrySet()) {
-                        if (entry.getValue().trim().equals("CONFIRMED")) {
-                            confirmlist.add(entry.getKey());
-                        }
-                    }
-                    System.out.println(confirmlist + "\n STCA: confirmed list. \n");
-                    if (confirmlist.size() > 0) {
-                        //random select one and assign GREEN
-                        Random rand = new Random();
-                        fd_code = confirmlist.get(rand.nextInt(confirmlist.size()));
-                        System.out.println(fd_code + "\n STCA: selected from the confirmed list. \n");
-
-                        List<String> cfp_msg = new ArrayList<>();
-                        ACLMessage cfp = new ACLMessage(ACLMessage.CFP);
-                        if (fd_code != null) {
-                            try {
-                                for (int i = 0; i < aircrafts.length; ++i) {
-                                    cfp.addReceiver(aircrafts[i]);
-                                    System.out.println(aircrafts[i].getName() + "\n");
+                               // String aid = result[i].getName().toString().trim().substring(result[i].getName().toString().trim().indexOf('F'), result[i].getName().toString().trim().indexOf('@'));
+                                aid_list.add(aid);// if aircraft is not in this list, STCA should not send GREEN
+                            }
+                            // select aircrafts to be INFORMED
+                            for (HashMap.Entry<String, String> entry : rqstq.entrySet()) {
+                                if (entry.getValue().trim().equals("CONFIRMED")) {
+                                    confirmlist.add(entry.getKey());
                                 }
-                                cfp_msg.add(fd_code);
-                                cfp_msg.add("GREEN");
-                                cfp.setContent(cfp_msg.toString());
-                                cfp.setConversationId("landing_aircraft");
-                                cfp.setReplyWith("cfp " + System.currentTimeMillis());
-                                myAgent.send(cfp);
-                                phase = 3;
-                                block();
-                            } catch (Exception ex) {
-                                ex.printStackTrace();
-                                System.out.println(nm + " NOT submitted CFP to STCA. \n");
-                                //phase =1;
+                            }
+
+                            //System.out.println(confirmlist + "\n STCA: confirmed list. \n");
+                            if (confirmlist.size() > 0) {
+                                //random select one and assign GREEN
+                                Random rand = new Random();
+                                fd_code = confirmlist.get(rand.nextInt(confirmlist.size()));
+                               // System.out.println(fd_code + "\n STCA: selected from the confirmed list. \n");
+                                //System.out.println(aid_list + "\n STCA: AID list. \n");
+
+                                List<String> inform_msg = new ArrayList<>();
+                                ACLMessage inform = new ACLMessage(ACLMessage.INFORM); // broadcast to all FDs
+                                if (fd_code != null) {
+                                    //check if still selected one is alive, else select other one
+                                    if (aid_list.contains(fd_code)) {
+                                        try {
+
+                                            inform_msg.add(fd_code);
+                                            inform_msg.add("GREEN");
+                                            inform.setContent(inform_msg.toString());
+                                            inform.setConversationId("aircraft");
+                                            for (int i = 0; i < aircrafts.length; ++i) {
+                                                inform.addReceiver(aircrafts[i]);// for all existing aircraft
+                                                System.out.println(nm + " ==> INFORM " + fd_code + " (GREEN) ==> " + aircrafts[i].getName() + "\n");
+                                            }
+                                            myAgent.send(inform);
+                                            if (!fd_code.equals("FD0")){//sniffer code
+
+                                                DFAgentDescription template = new DFAgentDescription();
+                                                ServiceDescription sd = new ServiceDescription();
+                                                sd.setName("tester");
+                                                sd.setType("landing");
+                                                template.addServices(sd);
+                                                try {
+
+                                                    DFAgentDescription[] resulttester = DFService.search(myAgent, template);
+                                                    AID[] tester = new AID[resulttester.length];
+                                                    for (int i = 0; i < resulttester.length; ++i) {
+                                                        tester[i] = resulttester[i].getName();
+                                                        sniff_aid = resulttester[i].getName();
+                                                    }
+
+                                                } catch (FIPAException fe) {
+                                                    fe.printStackTrace();
+                                                }
+//                                                System.out.println(nm + " ==> INFORM " + sniff_aid + " (LEAKED) ==> \n");
+                                                inform.setConversationId("sniffer");
+                                                inform.addReceiver(sniff_aid);
+                                                myAgent.send(inform);
+                                            }
+                                            phase = 2;
+                                            //block();
+                                        } catch (Exception ex) {
+                                            ex.printStackTrace();
+                                        }
+                                    } else {
+                                        confirmlist.remove(fd_code);
+                                        //System.out.println(fd_code + "\n STCA: delete NOTALIVE aircraft. \n");
+                                        phase = 1;
+//                                        block();
+                                    }
+                                } else {
+                                    //System.out.println(fd_code + "\n STCA: selected FD is not alive. \n");
+                                    phase = 1;
+//                                    block();
+                                }
+                            } else {
+                                //System.out.println(nm + ": confirmation list empty. \n");
+//                                phase = 0;
                                 block();
                             }
-                        }else {
-                            System.out.println(fd_code + "\n STCA: selected from the confirmed list. \n");
-                            //phase = 1;
+
+                        } else {
+                            //System.out.println(nm + " no Aircraft nearby.\n");
+//                            phase = 1;
                             block();
                         }
-                    }else {
-                        block();
-                    }
-            }
 
+                    } catch (Exception fe) {
+                        fe.printStackTrace();
+                    }
+
+                case 2:// get message from FD
+                    mt = MessageTemplate.MatchPerformative(ACLMessage.INFORM);
+                    msg = myAgent.receive(mt);
+                    if (msg != null) {
+//                        if (msg.getSender().getName() != "Manager") {
+                        inform_content = new ArrayList<String>(Arrays.asList(msg.getContent().replaceAll("\\[|\\]", "").split(",")));
+                        if (inform_content.get(1).trim().equals("RELEASED")) {
+                            count++; //controlling whether all airplane have accomplished their goal
+                            //System.out.println(nm + " \n counting alive FD\n");
+                            if (count == aircraftNumber.getAN()) { //number of aircraft reported RELEASED
+                                myAgent.doDelete();
+                            }
+                            //phase = 1;
+                        }else{
+                           // System.out.println(nm + " \n Aircraft replay is NOT a RELEASED\n");
+//                            phase = 0;
+                            block();
+                        }
+                    } else {
+                        //System.out.println(nm + " \n Aircraft replay not yet received.\n");
+//                        phase = 0;
+                        block();
+
+                    }
+                    phase = 3;
+            }
         }
 
         public boolean done() {
